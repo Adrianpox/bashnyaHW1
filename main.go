@@ -50,11 +50,21 @@ func main() {
 					createFile(contentName, currPath)
 				case "folder":
 					createFolder(contentName, currPath)
+
 				default:
 					printError("Неверное указан тип")
 				}
 			} else {
+				if strings.TrimSpace(contentName) == "" || checkInvalidSymbol(contentName) {
+					printError("Недопустимое имя")
+					continue
+				}
 				path := filepath.Join(currPath, contentName)
+				_, err := os.Stat(path)
+				if err != nil {
+					printError("Файл или папка не найдены")
+					continue
+				}
 				switch contentType {
 				case "file":
 					deleteFile(path)
@@ -62,12 +72,14 @@ func main() {
 					fmt.Println("Вы действительно хотите удалить папку " + contentName + " со всем содержимым?")
 					fmt.Println("Введите " + colors.Bold + "yes" + colors.Reset + " или " + colors.Bold + "no" + colors.Reset)
 					scanner.Scan()
-					isDelete := scanner.Text()
+					isDelete := strings.TrimSpace(scanner.Text())
 					switch isDelete {
-					case "yes":
+					case "yes", "y":
 						deleteFolder(path)
-					case "no":
+					case "no", "n":
 						continue
+					default:
+						fmt.Println("Введите " + colors.Bold + "yes" + colors.Reset + " или " + colors.Bold + "no" + colors.Reset)
 					}
 
 				}
@@ -85,11 +97,19 @@ func main() {
 				continue
 			}
 			oldName := fields[1]
-			filePath := currPath + "\\" + oldName
-
+			filePath := filepath.Join(currPath, oldName)
+			_, err := os.Stat(filePath)
+			if err != nil {
+				printError("Файл или папка не найдены")
+				continue
+			}
 			fmt.Println("Введите новое название")
 			scanner.Scan()
 			newName := scanner.Text()
+			if strings.TrimSpace(newName) == "" || checkInvalidSymbol(newName) {
+				printError("Недопустимое имя")
+				continue
+			}
 			renameContent(filePath, newName)
 
 		case "exit":
@@ -105,34 +125,50 @@ func main() {
 /********* ФУНКЦИИ *********/
 
 func createFile(fileName string, currPath string) {
-	_, error := os.Stat(filepath.Join(currPath, fileName))
-	if os.IsNotExist(error) {
-		file, err := os.Create(filepath.Join(currPath, fileName))
-		if err != nil {
-			fmt.Println("Error", err)
-			return
-		}
-		defer file.Close()
-		fmt.Println("Файл успешно создан")
+	if checkInvalidSymbol(fileName) {
+		printError("Название содержит недопустимые символы")
 	} else {
-		printError("Файл с таким названием уже существует")
+		_, error := os.Stat(filepath.Join(currPath, fileName))
+		if os.IsNotExist(error) {
+			file, err := os.Create(filepath.Join(currPath, fileName))
+			if err != nil {
+				printError("Ошибка создания файла")
+				return
+			}
+			defer file.Close()
+			fmt.Println("Файл успешно создан")
+		} else {
+			printError("Файл с таким названием уже существует")
+		}
 	}
 
 }
 
 func createFolder(folderName string, currPath string) {
-	err := os.Mkdir(filepath.Join(currPath, folderName), 0777)
-	if err != nil {
-		printError("Папка с таким названием уже существует")
+	if checkInvalidSymbol(folderName) {
+		printError("Название содержит недопустимые символы")
 	} else {
-		fmt.Println("Папка успешно создана")
+		_, error := os.Stat(filepath.Join(currPath, folderName))
+		if os.IsNotExist(error) {
+			err := os.Mkdir(filepath.Join(currPath, folderName), 0777)
+			if err != nil {
+				printError("Ошибка создания папки")
+			} else {
+				fmt.Println("Папка успешно создана")
+			}
+		} else {
+			printError("Папка с таким названием уже существует")
+
+		}
+
 	}
+
 }
 
 func deleteFolder(folderAdress string) {
 	err := os.RemoveAll(folderAdress)
 	if err != nil {
-		fmt.Println("Error", err)
+		printError("Ошибка удаления")
 		return
 	}
 	fmt.Println("Успешное удаление")
@@ -141,16 +177,16 @@ func deleteFolder(folderAdress string) {
 func deleteFile(fileAdress string) {
 	err := os.Remove(fileAdress)
 	if err != nil {
-		fmt.Println("Error", err)
+		printError("Ошибка удаления")
 		return
 	}
 	fmt.Println("Успешное удаление")
 }
 
 func moveToFolder(folderName string, currPath string) string {
-	_, err := os.Stat(filepath.Join(currPath, folderName))
-	if os.IsNotExist(err) {
-		printError("Папки не существует")
+	file, err := os.Stat(filepath.Join(currPath, folderName))
+	if err != nil || !file.IsDir() {
+		printError("Папки с таким названием не существует")
 	} else {
 		currPath = filepath.Join(currPath, folderName)
 	}
@@ -158,21 +194,20 @@ func moveToFolder(folderName string, currPath string) string {
 }
 
 func backToFolder(currPath string) string {
-	arr := strings.Split(currPath, "\\")
-	currPath = strings.Join(arr[:len(arr)-1], "\\")
-	return currPath
+	return filepath.Dir(currPath)
 }
 
 func showContent(currPath string) {
 	files, err := os.ReadDir(currPath)
 	if err != nil {
-		fmt.Println("Error", err)
+		printError("Не удалось прочитать папку")
+		return
 	}
 	if len(files) == 0 {
 		fmt.Println(colors.Bold + colors.Cyan + "Папка пустая" + colors.Reset)
 	}
 	for _, file := range files {
-		filePath := currPath + "\\" + file.Name()
+		filePath := filepath.Join(currPath, file.Name())
 		fileInfo, err := os.Lstat(filePath)
 		if err != nil {
 			fmt.Println("Error", err)
@@ -189,7 +224,7 @@ func showContent(currPath string) {
 }
 
 func renameContent(currPath string, newName string) {
-	newPath := backToFolder(currPath) + "\\" + newName
+	newPath := filepath.Join(backToFolder(currPath), strings.TrimSpace(newName))
 	err := os.Rename(currPath, newPath)
 	if err != nil {
 		fmt.Println("Error", err)
@@ -207,6 +242,14 @@ func showHelp() {
 	fmt.Println("7." + colors.Italic + colors.Bold + "exit " + colors.Reset + "- команда для завершения программы")
 }
 
-func printError(error string) {
-	fmt.Println(colors.Bold + colors.Red + " " + error + colors.Reset)
+func printError(err string) {
+	fmt.Println(colors.Bold + colors.Red + err + colors.Reset)
+}
+
+func checkInvalidSymbol(contentName string) bool {
+	invalid := "\"<>\\:/?*|"
+	if strings.ContainsAny(contentName, invalid) {
+		return true
+	}
+	return false
 }
