@@ -9,13 +9,6 @@ import (
 	"strings"
 )
 
-/*
-Создать папку
-Удалить папку
-Создать файл
-Удалить файл
-*/
-
 func main() {
 	fmt.Println("Введите help, чтобы увидеть список доступных команд")
 	scanner := bufio.NewScanner(os.Stdin)
@@ -36,79 +29,68 @@ func main() {
 			contentType := fields[1]
 			contentName := fields[2]
 
-			if cmd == "create" {
-
-				if contentType == "file" {
+			switch cmd {
+			case "create":
+				switch contentType {
+				case "file":
 					createFile(contentName, currPath)
-				}
-
-				if contentType == "folder" {
+				case "folder":
 					createFolder(contentName, currPath)
 				}
-			}
-
-			if cmd == "delete" {
+			case "delete":
 				path := currPath + "\\" + contentName
-
-				if contentType == "file" {
+				switch contentType {
+				case "file":
 					deleteFile(path)
-				}
-
-				if contentType == "folder" {
+				case "folder":
 					deleteFolder(path)
 				}
+			default:
+				fmt.Println(colors.Red + colors.Bold + "Неверно введена команда" + colors.Reset)
+				fmt.Println("Чтобы посмотреть список доступных команд введите" + colors.Bold + "help" + colors.Reset)
+			}
+		} else {
+			switch cmd {
+			case "help":
+				fmt.Println(colors.Bold + "Список доступных команд" + colors.Reset)
+				fmt.Println("1." + colors.Italic + colors.Bold + "cd <папка> " + colors.Reset + "- команда для перехода в папку внутри текущего хранилища")
+				fmt.Println("2." + colors.Italic + colors.Bold + "cd.. " + colors.Reset + "- команда для возвращения к предыдущей папке")
+				fmt.Println("3." + colors.Italic + colors.Bold + " create file <имя> " + colors.Reset + "/" + colors.Italic + colors.Bold + " create folder <имя> " + colors.Reset + "- команда для создания нового файла или папки в хранилище, в которым вы находитесь")
+				fmt.Println("4." + colors.Italic + colors.Bold + " delete file <имя> " + colors.Reset + "/" + colors.Italic + colors.Bold + " delete folder <имя> " + colors.Reset + "- команда для удаления файла или папки в хранилище, в которым вы находитесь")
+				fmt.Println("5." + colors.Italic + colors.Bold + " rename <имя> " + colors.Reset + "- команда для переименования файла или папки в хранилище, в которым вы находитесь")
+				fmt.Println("6." + colors.Italic + colors.Bold + "show " + colors.Reset + "- команда для показа всех папок и файлов, находящихся в хранилище, в котором вы сейчас находитесь")
+				fmt.Println("7." + colors.Italic + colors.Bold + "exit " + colors.Reset + "- команда для завершения программы")
+
+			case "cd":
+				_, err := os.Stat(moveToFolder(fields[1], currPath))
+				if os.IsNotExist(err) {
+					fmt.Println("Папки не существует")
+				} else {
+					currPath = moveToFolder(fields[1], currPath)
+				}
+
+			case "cd..":
+				currPath = backToFolder(currPath)
+
+			case "show":
+				showContent(currPath)
+
+			case "rename":
+				oldName := fields[1]
+				filePath := currPath + "\\" + oldName
+
+				fmt.Println("Введите новое название")
+				scanner.Scan()
+				newName := scanner.Text()
+				renameContent(filePath, newName)
+
+			case "exit":
+				return
+			default:
+				fmt.Println(colors.Red + colors.Bold + "Неверно введена команда" + colors.Reset)
+				fmt.Println("Чтобы посмотреть список доступных команд введите " + colors.Bold + "help" + colors.Reset)
 			}
 		}
-
-		if cmd == "help" {
-			fmt.Println(colors.Bold + "Список доступных команд" + colors.Reset)
-			fmt.Println("1." + colors.Italic + colors.Bold + "cd " + " + название папки " + colors.Reset + "- команда для перехода в папку внутри текущего хранилища")
-			fmt.Println("2." + colors.Italic + colors.Bold + "cd.. " + colors.Reset + "- команда для возвращения к предыдущей папке")
-			fmt.Println("3." + colors.Italic + colors.Bold + " create + file или folder + " + "название " + colors.Reset + "- команда для создания нового файла или папки в хранилище, в которым вы находитесь")
-			fmt.Println("4." + colors.Italic + colors.Bold + " delete + file или folder + " + "название " + colors.Reset + "- команда для удаления файла или папки в хранилище, в которым вы находитесь")
-			fmt.Println("5." + colors.Italic + colors.Bold + " rename + название " + colors.Reset + "- команда для переименования файла или папки в хранилище, в которым вы находитесь")
-			fmt.Println("6." + colors.Italic + colors.Bold + "show " + colors.Reset + "- команда для показа всех папок и файлов, находящихся в хранилище, в котором вы сейчас находитесь")
-			fmt.Println("7." + colors.Italic + colors.Bold + "exit " + colors.Reset + "- команда для завершения программы")
-		}
-
-		if cmd == "cd" {
-			_, err := os.Stat(moveToFolder(fields[1], currPath))
-			if os.IsNotExist(err) {
-				fmt.Println("Файла не существует")
-			} else {
-				currPath = moveToFolder(fields[1], currPath)
-			}
-		}
-
-		if cmd == "cd.." {
-			currPath = backToFolder(currPath)
-		}
-
-		if cmd == "rename" {
-			oldName := fields[1]
-			filePath := currPath + "\\" + oldName
-
-			fmt.Println("Введите новое название")
-			scanner.Scan()
-			newName := scanner.Text()
-			renameContent(filePath, newName)
-		}
-
-		if cmd == "show" {
-			showContent(currPath)
-		}
-
-		if cmd == "exit" {
-			return
-		}
-
-		if cmd == "path" {
-			fmt.Println("Главный путь ", mainPath)
-			fmt.Println("Текущий путь ", currPath)
-		}
-
-		//fmt.Println(colors.Red + "Неверно введена команда" + colors.Reset)
-		//fmt.Println("Введите help, чтобы увидеть список доступных команд")
 	}
 }
 
