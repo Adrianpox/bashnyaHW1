@@ -4,8 +4,11 @@ import (
 	"bufio"
 	"fmt"
 	"homework/colors"
+	"homework/render"
+	"homework/task"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 )
 
@@ -111,6 +114,15 @@ func main() {
 				continue
 			}
 			renameContent(filePath, newName)
+
+		case "add":
+			addTask(scanner, currPath)
+
+		case "list":
+			listTasks(scanner, currPath)
+
+		case "done":
+			doneTask(scanner, currPath)
 
 		case "exit":
 			return
@@ -240,6 +252,9 @@ func showHelp() {
 	fmt.Println("5." + colors.Italic + colors.Bold + " rename <имя> " + colors.Reset + "- команда для переименования файла или папки в хранилище, в которым вы находитесь")
 	fmt.Println("6." + colors.Italic + colors.Bold + "show " + colors.Reset + "- команда для показа всех папок и файлов, находящихся в хранилище, в котором вы сейчас находитесь")
 	fmt.Println("7." + colors.Italic + colors.Bold + "exit " + colors.Reset + "- команда для завершения программы")
+	fmt.Println("8." + colors.Italic + colors.Bold + "add " + colors.Reset + "- добавить задачу в файл")
+	fmt.Println("9." + colors.Italic + colors.Bold + "list " + colors.Reset + "- показать все задачи из файла")
+	fmt.Println("10." + colors.Italic + colors.Bold + "done " + colors.Reset + "- отметить задачу выполненной")
 }
 
 func printError(err string) {
@@ -252,4 +267,83 @@ func checkInvalidSymbol(contentName string) bool {
 		return true
 	}
 	return false
+}
+
+func askFile(scanner *bufio.Scanner) (string, bool) {
+	fmt.Print("Введите файл: ")
+	scanner.Scan()
+	name := strings.TrimSpace(scanner.Text())
+	if name == "" {
+		printError("Имя файла не может быть пустым")
+		return "", false
+	}
+	return name, true
+}
+
+func addTask(scanner *bufio.Scanner, currPath string) {
+	name, ok := askFile(scanner)
+	if !ok {
+		return
+	}
+	path := filepath.Join(currPath, name)
+
+	fmt.Print("Введите текст задачи: ")
+	scanner.Scan()
+	text := scanner.Text()
+
+	if err := task.Add(path, text); err != nil {
+		printError(err.Error())
+		return
+	}
+	fmt.Println("Задача добавлена")
+}
+
+func listTasks(scanner *bufio.Scanner, currPath string) {
+	name, ok := askFile(scanner)
+	if !ok {
+		return
+	}
+	path := filepath.Join(currPath, name)
+
+	tasks, err := task.Load(path)
+	if err != nil {
+		printError(err.Error())
+		return
+	}
+	render.TaskList(os.Stdout, tasks)
+}
+
+func doneTask(scanner *bufio.Scanner, currPath string) {
+	name, ok := askFile(scanner)
+	if !ok {
+		return
+	}
+	path := filepath.Join(currPath, name)
+
+	tasks, err := task.Load(path)
+	if err != nil {
+		printError(err.Error())
+		return
+	}
+	if len(tasks) == 0 {
+		printError("Нет задач")
+		return
+	}
+
+	render.TaskList(os.Stdout, tasks)
+
+	fmt.Print("Введите номер задачи: ")
+	scanner.Scan()
+	input := strings.TrimSpace(scanner.Text())
+	order, err := strconv.Atoi(input)
+	if err != nil {
+		printError("Нужно ввести число")
+		return
+	}
+
+	if err := task.MarkDone(path, order); err != nil {
+		printError(err.Error())
+		return
+	}
+	fmt.Println("Задача отмечена выполненной")
 }
